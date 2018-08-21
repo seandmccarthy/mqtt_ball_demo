@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQTT Demo</title>
+  <style>
+body {
+  font-family: Arial;
+}
+div.tab-wrapper {
+  width: 60%;
+  margin: auto;
+}
+
+div.tab-button-wrapper ul {
+  padding: 0;
+  list-style: none;
+}
+
+div.tab-button-wrapper li {
+  float: left;
+}
+
+a.tab-button-first {
+  border-radius: 3px 0 0 0;
+  -webkit-border-radius: 3px 0 0 0;
+  -moz-border-radius: 3px 0 0 0;
+}
+
+a.tab-button-last {
+  border-radius: 0 3px 0 0;
+  -webkit-border-radius: 0 3px 0 0;
+  -moz-border-radius: 0 3px 0 0;
+  border-right: none;
+}
+
+div.tab-button-wrapper a {
+  display: block;
+  padding: 1em;
+  text-decoration: none;
+  color: #252525;
+  background-color: #FFFFFF;
+  border-right: 1px solid black;
+}
+
+a.tab-button-hidden {
+  opacity: 0.5;
+}
+
+div.tab-body {
+  padding: 1em;
+  clear: both;
+  background-color: #FFFFFF;
+  min-height: 85%;
+  border-radius: 0 3px 3px 3px;
+  -webkit-border-radius: 0 3px 3px 3px;
+  -moz-border-radius: 0 3px 3px 3px;
+}
+
+div.tab-body-hidden {
+  display: none;
+}
+  #garden {
+    position: relative;
+    width : 500px;
+    height: 500px;
+    border: 5px solid #CCC;
+    border-radius: 10px;
+  }
+
+  #ball {
+    position: absolute;
+    top   : 240px;
+    left  : 240px;
+    width : 20px;
+    height: 20px;
+    background: green;
+    border-radius: 100%;
+  }
+  </style>
+  <script src="./mqttws31.js" type="text/javascript"></script>
+  <script type="text/javascript">
+  var messageByteCount = 0;
+  var messageCount = 0;
+
+  </script>
+  </head>
+  <body>
+    <div id="garden">
+      <div id="ball"></div>
+    </div>
+    <div id="x-pos"></div>
+    <div id="y-pos"></div>
+    <table>
+      <tr>
+        <td>Message Count: </td><td><span id="demo1-msg-count">0</span></td>
+      </tr>
+      <tr>
+        <td>Message Bytes: </td><td><span id="demo1-msg-bytes">0</span></td>
+      </tr>
+    </table>
+    <script>
+      var ball   = document.getElementById('ball');
+      var garden = document.getElementById('garden');
+      var output = document.getElementById('output');
+
+      var maxX = garden.clientWidth  - ball.clientWidth;
+      var maxY = garden.clientHeight - ball.clientHeight;
+      var client = new Paho.MQTT.Client("<%= mqtt_host %>", Number(<%= mqtt_port %>), "/", "reader_client");
+
+      // set callback handlers
+      client.onConnectionLost = onConnectionLost;
+      client.onMessageArrived = onMessageArrived;
+
+      // connect the client
+      client.connect({onSuccess:onConnect, onFailure:onFailure});
+
+      // called when the client connects
+      function onConnect() {
+        // Once a connection has been made, make a subscription and send a message.
+        console.log("onConnect");
+        client.subscribe("demo/+");
+      }
+
+      function onFailure(resp) {
+        console.log(resp.errorMessage);
+      }
+
+      // called when the client loses its connection
+      function onConnectionLost(responseObject) {
+        if (responseObject.errorCode !== 0) {
+          console.log("onConnectionLost:"+responseObject.errorMessage);
+          alert("MQTT connection lost");
+        }
+      }
+
+      // called when a message arrives
+      function onMessageArrived(message) {
+        messageCount++;
+        messageByteCount += message.payloadString.length;
+        if (message.destinationName === "demo/1")
+        {
+          handleOrientation(message.payloadString);
+          document.getElementById("demo1-msg-count").textContent = messageCount;
+          document.getElementById("demo1-msg-bytes").textContent = messageByteCount.toLocaleString("en-US");
+        }
+        else if (message.destinationName === "demo/2")
+        {
+          document.getElementById("dynImg").src = "data:image/jpg;base64," + message.payloadString;
+          document.getElementById("msg-count").textContent = messageCount;
+          document.getElementById("msg-bytes").textContent = messageByteCount.toLocaleString("en-US");
+        }
+      }
+
+      function handleOrientation(data) {
+        var coords = data.split('|');
+        var x = parseFloat(coords[0]);
+        var y = parseFloat(coords[1]);
+        document.getElementById("x-pos").textContent = x;
+        document.getElementById("y-pos").textContent = y;
+
+        // 10 is half the size of the ball
+        // It center the positioning point to the center of the ball
+        ball.style.top  = (maxX*x/180 - 10) + "px";
+        ball.style.left = (maxY*y/180 - 10) + "px";
+      }
+    </script>
+  </body>
+</html>
